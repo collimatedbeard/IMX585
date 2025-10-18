@@ -25,7 +25,6 @@ def takePhotoBtn_cb():
 
 def startVideoBtn_cb():
     dpg.set_value("tbLog", "Please refrain from clicking this button.\n")
-    dpg.save_init_file("585mtool.ini")
     # execCommand(buildCmdLines(singleFrame=False))
 
 def dncBtn_cb():
@@ -298,7 +297,19 @@ with dpg.window(label="Image", tag="Primary Window"):
     dpg.add_image("texture_tag", tag="image_tag")
 
 
-with dpg.window(label = "Controls", height = 650, width = 400, tag="Controls"):
+with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
+    with dpg.menu_bar():
+        with dpg.menu(label="File"):
+            dpg.add_menu_item(label="Save screen")
+            dpg.add_menu_item(label="Export DNG")
+            dpg.add_menu_item(label="Exit", callback=lambda: dpg.stop_dearpygui())
+
+        with dpg.menu(label="Settings"):
+            dpg.add_menu_item(label="Save window position", callback=lambda: dpg.save_init_file("585mtool.ini"))
+
+        with dpg.menu(label="Help"):
+            dpg.add_menu_item(label="About")
+
     with dpg.table(header_row=False):
         dpg.add_table_column()
         dpg.add_table_column()
@@ -351,7 +362,7 @@ with dpg.window(label = "Controls", height = 650, width = 400, tag="Controls"):
         dpg.add_input_int(label="Value", tag="inBlackLvl", default_value=3200, max_value=4000, width=150)
     with dpg.group(horizontal=True):
         dpg.add_checkbox(label="De-Bayer", tag="cbDebayer", default_value=True, callback=lambda: processImage())
-        dpg.add_checkbox(label="12bit un-shift", tag="cb12Bit", callback=lambda: processImage())
+        dpg.add_checkbox(label="12-bit un-shift", tag="cb12Bit", callback=lambda: processImage())
     with dpg.group(horizontal=True):
         dpg.add_text("Stretch bottom ")
         dpg.add_combo(("from 0", "auto"), default_value="from 0", fit_width=True, tag="inStrFrom", callback=lambda: stretchCB_cb())
