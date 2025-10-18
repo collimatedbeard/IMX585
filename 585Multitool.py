@@ -173,9 +173,6 @@ def processImage():
     if "HDR" in dpg.get_value("cSensMode"):
         setLG = (black_level, 0)[dpg.get_value("cbBlackLvl")] + dpg.get_value("inLG")
         setHG = (black_level, 0)[dpg.get_value("cbBlackLvl")] + dpg.get_value("inHG")
-        # if dpg.get_value("cb12Bit"):
-        #     setLG = setLG >> 4
-        #     setHG = setHG >> 4
     else:
         setHG = 0
         setLG = 0
@@ -187,7 +184,7 @@ def processImage():
         dataimg = dataraw.copy()
 
     if dpg.get_value("cb12Bit"):
-        dataimg = np.right_shift(dataimg, np.uint16(4)) # back to 12 bit
+        dataimg = np.right_shift(dataimg, np.uint16(4)) # back to 12 bit, original image is shifted by four bits for some reason (so PI ISP can expose correctly?)
 
     width = dataimg.size // height
     dataimg = np.reshape(dataimg, (height, width))
@@ -203,9 +200,27 @@ def processImage():
     elif dpg.get_value("inShowParts") == "Above HG":
         dataimg[dataimg < setLG] = 0
     
-    # Create pic texture
-    if dpg.get_value("cbDebayer"):
+    # extract color chanels if we are not doing DeBayer or Raw, we will need them later
+    if dpg.get_value("inDeBayer") in ["RG/GB", "R", "G1", "G2", "B"]:
+        R  = dataimg[0::2, 0::2]
+        G1 = dataimg[0::2, 1::2]
+        G2 = dataimg[1::2, 0::2]
+        B  = dataimg[1::2, 1::2]
+    if dpg.get_value("inDeBayer") == "RGB":
         imgbuffer = cv2.cvtColor(dataimg, cv2.COLOR_BAYER_RGGB2RGB)
+    elif dpg.get_value("inDeBayer") == "RG/GB":
+        top_row = np.hstack([R, G1])
+        bottom_row = np.hstack([G2, B])
+        combined = np.vstack([top_row, bottom_row])
+        imgbuffer = cv2.cvtColor(combined, cv2.COLOR_GRAY2RGB)
+    elif dpg.get_value("inDeBayer") == "R":
+        imgbuffer = cv2.cvtColor(R,  cv2.COLOR_GRAY2RGB)
+    elif dpg.get_value("inDeBayer") == "G1":
+        imgbuffer = cv2.cvtColor(G1, cv2.COLOR_GRAY2RGB)
+    elif dpg.get_value("inDeBayer") == "G2":
+        imgbuffer = cv2.cvtColor(G2, cv2.COLOR_GRAY2RGB)
+    elif dpg.get_value("inDeBayer") == "B":
+        imgbuffer = cv2.cvtColor(B,  cv2.COLOR_GRAY2RGB)
     else:
         imgbuffer = cv2.cvtColor(dataimg, cv2.COLOR_GRAY2RGB)
     imgbuffer = cv2.resize(imgbuffer, [3840//resize_fac, 2160//resize_fac])
@@ -224,7 +239,7 @@ def processImage():
     imgbuffer = np.clip(imgbuffer, minval, maxval)
     imgbuffer = (imgbuffer - minval) / maxval # Scale values to 0..1 which is required for DerPyGUI texture
 
-    if dpg.get_value("cbProcessColor"):
+    if dpg.get_value("cbProcessColor") and dpg.get_value("inDeBayer") == "RGB":
         # WB
         imgbuffer[:,:, 0] *= dpg.get_value("inGainR") # red channel
         imgbuffer[:,:, 2] *= dpg.get_value("inGainB") # blue channel
@@ -242,7 +257,14 @@ def processImage():
         imgbuffer = cv2.cvtColor(corrected_xyz, cv2.COLOR_XYZ2RGB)
         # imgbuffer = imgbuffer / np.ptp(imgbuffer) # scale again
         imgbuffer = np.clip(imgbuffer, 0, 1) # Clip values back to valid range 0..1
-        
+    # if we are in single grayscale color mode, we could show effects of WB coefficients
+    if dpg.get_value("cbProcessColor") and dpg.get_value("inDeBayer") == "R":
+        imgbuffer[:,:] *= dpg.get_value("inGainR") # red channel
+    # green is always 1.0, no point in processing that
+    if dpg.get_value("cbProcessColor") and dpg.get_value("inDeBayer") == "B":
+        imgbuffer[:,:] *= dpg.get_value("inGainB") # blue channel
+
+    # Create pic texture
     texture_data = imgbuffer.ravel()
     raw_data = np.array(texture_data, dtype=np.float32)
     dpg.set_value("texture_tag", raw_data)
@@ -361,7 +383,6 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
         dpg.add_checkbox(label="Black Level", tag="cbBlackLvl", callback=lambda: processImage())
         dpg.add_input_int(label="Value", tag="inBlackLvl", default_value=3200, max_value=4000, width=150)
     with dpg.group(horizontal=True):
-        dpg.add_checkbox(label="De-Bayer", tag="cbDebayer", default_value=True, callback=lambda: processImage())
         dpg.add_checkbox(label="12-bit un-shift", tag="cb12Bit", callback=lambda: processImage())
     with dpg.group(horizontal=True):
         dpg.add_text("Stretch bottom ")
@@ -371,6 +392,10 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
     with dpg.group(horizontal=True):
         dpg.add_text("Show:")
         dpg.add_radio_button(("All", "Below LG", "Between", "Above HG"), tag="inShowParts", default_value="All", horizontal=True, callback=lambda: processImage())
+    
+    dpg.add_separator(label="De-Bayer")
+    dpg.add_radio_button(("RGB", "RG/GB", "R", "G1", "G2", "B", "Raw"), tag="inDeBayer", default_value="RGB", horizontal=True, callback=lambda: processImage())
+    
     dpg.add_separator(label="Color")
     dpg.add_checkbox(label="Fine color processing", tag="cbProcessColor", callback=lambda: processImage())
     with dpg.group(horizontal=True):
