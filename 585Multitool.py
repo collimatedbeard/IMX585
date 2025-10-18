@@ -7,6 +7,7 @@ import glob
 import json
 from fabric import Connection
 
+dpg.create_context()
 
 height = 2180
 stride = 7744
@@ -18,14 +19,13 @@ dataraw = np.zeros([height*stride], dtype=np.uint16)
 x_data = np.zeros([65535], dtype=np.float32)
 hist = np.zeros([65535], dtype=np.float32)
 
-dpg.create_context()
-
 def takePhotoBtn_cb():
     dpg.set_value("tbLog", "Running...\n")
     execCommand(buildCmdLines(singleFrame=True))
 
 def startVideoBtn_cb():
     dpg.set_value("tbLog", "Please refrain from clicking this button.\n")
+    dpg.save_init_file("585mtool.ini")
     # execCommand(buildCmdLines(singleFrame=False))
 
 def dncBtn_cb():
@@ -288,6 +288,7 @@ with dpg.theme(tag="__window_noborder"):
             dpg.add_theme_color(dpg.mvPlotCol_Line, (200, 200, 200), category=dpg.mvThemeCat_Plots)
             dpg.add_theme_color(dpg.mvPlotCol_Fill, (150, 150, 150, 100), category=dpg.mvThemeCat_Plots)
 
+dpg.configure_app(init_file="585mtool.ini")
 
 with dpg.window(label="Image", tag="Primary Window"):
     raw_data = np.zeros([(2160//resize_fac) * (3840//resize_fac) * 3], dtype=np.float32)
@@ -297,7 +298,7 @@ with dpg.window(label="Image", tag="Primary Window"):
     dpg.add_image("texture_tag", tag="image_tag")
 
 
-with dpg.window(label = "Controls", pos = (1900, 30), height = 650, width = 400, tag="Controls"):
+with dpg.window(label = "Controls", height = 650, width = 400, tag="Controls"):
     with dpg.table(header_row=False):
         dpg.add_table_column()
         dpg.add_table_column()
@@ -407,7 +408,7 @@ with dpg.window(label = "Controls", pos = (1900, 30), height = 650, width = 400,
                         dpg.add_drag_float(tag=f"ccmC{c}R{r}", width=-1, default_value=1.0 if c==r else 0.0, format="%.6f")
 
 
-with dpg.window(label="Histogram", pos=(1100, 30), height=400, width=750, no_scrollbar=True, tag="Histogram"):
+with dpg.window(label="Histogram", height=400, width=750, no_scrollbar=True, tag="Histogram"):
     with dpg.plot(label="Image Histogram", height=-1, width=-1, tag="histogram_plot"):
         # Configure plot axes
         dpg.add_plot_axis(dpg.mvXAxis, label="Pixel Value", tag="x_axis")
@@ -420,7 +421,7 @@ with dpg.window(label="Histogram", pos=(1100, 30), height=400, width=750, no_scr
         dpg.add_line_series(x_data, hist, label="Histogram", tag="hist_data", parent="x_axis", shaded=True)
         dpg.bind_item_theme("hist_data", "__series_theme_shaded")
 
-with dpg.window(label = "Log", pos=(1100, 450), height=500, width=750, tag="Log"):
+with dpg.window(label = "Log", height=500, width=750, tag="Log"):
     dpg.add_input_text(multiline=True, height=-1, width=-1, tag="tbLog")
 
 
