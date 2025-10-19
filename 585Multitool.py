@@ -2,18 +2,25 @@ import dearpygui.dearpygui as dpg
 import numpy as np
 import cv2
 import os
+import shutil
 import random
 import glob
 import json
+import argparse
 from fabric import Connection
 
 dpg.create_context()
 
+parser = argparse.ArgumentParser(description='IMX585 Multitool by Collimated Beard')
+parser.add_argument('hostname', help='Raspberry Pi hostname', nargs='?', default='cinepi')
+args = parser.parse_args()
+
 height = 2180
 stride = 7744
 resize_fac = 1
-black_level = 3200
 frameNrForPreview =  7 # Warning: if you are changing this value, make sure there are enough frames in recording
+host_name = args.hostname
+ssh_mode = True
 
 dataraw = np.zeros([height*stride], dtype=np.uint16)
 x_data = np.zeros([65535], dtype=np.float32)
@@ -22,6 +29,11 @@ hist = np.zeros([65535], dtype=np.float32)
 def takePhotoBtn_cb():
     dpg.set_value("tbLog", "Running...\n")
     execCommand(buildCmdLines(singleFrame=True))
+    with open(f'test_{frameNrForPreview:05d}.raw', "rb") as rawfile:
+        global dataraw
+        dataraw = np.fromfile(rawfile, np.uint16)
+        processImage()
+
 
 def startVideoBtn_cb():
     dpg.set_value("tbLog", "Please refrain from clicking this button.\n")
@@ -61,19 +73,21 @@ def readMetadataExpBtn_cb():
 
         
 def execCommand(cmdString):
-    c = Connection('cinepi')
-    for cmd in cmdString:
-        result = c.run(cmd, hide=True, warn=True, pty=True)
-        dpg.set_value("tbLog", dpg.get_value("tbLog")
-                            + f'\n{result.command} {("FAIL", "OK")[result.ok]}\n'
-                            + result.stdout)
-    c.get(f'/tmp/test_{frameNrForPreview:05d}.raw', preserve_mode=False)
-    c.get(f'/tmp/test.txt', preserve_mode=False)
-    with open(f'test_{frameNrForPreview:05d}.raw', "rb") as rawfile:
-        global dataraw
-        dataraw = np.fromfile(rawfile, np.uint16)
-        processImage()
-
+    if ssh_mode:
+        c = Connection(host_name)
+        for cmd in cmdString:
+            result = c.run(cmd, hide=True, warn=True, pty=True)
+            dpg.set_value("tbLog", dpg.get_value("tbLog")
+                                + f'\n{result.command} {("FAIL", "OK")[result.ok]}\n'
+                                + result.stdout)
+        c.get(f'/tmp/test_{frameNrForPreview:05d}.raw', preserve_mode=False)
+        c.get('/tmp/test.txt', preserve_mode=False)
+    else:
+        for cmd in cmdString:
+            result = os.popen(cmd).read()
+            dpg.set_value("tbLog", dpg.get_value("tbLog") + result)
+            shutil.copy2(f'/tmp/test_{frameNrForPreview:05d}.raw', os.getcwd())
+            shutil.copy2('/tmp/test.txt', os.getcwd())
 
 def buildCmdLines(singleFrame = True):
     cmds = []
@@ -460,11 +474,10 @@ with dpg.window(label="Histogram", height=400, width=750, no_scrollbar=True, tag
 with dpg.window(label = "Log", height=500, width=750, tag="Log"):
     dpg.add_input_text(multiline=True, height=-1, width=-1, tag="tbLog")
 
-
 dpg.bind_item_theme("Histogram", "__window_nopad")
 dpg.bind_item_theme("Primary Window", "__window_noborder")
 
-dpg.create_viewport(title='IMX585 Multitool', width = 1920, height = 1180)
+dpg.create_viewport(title='IMX585 Multitool')
 dpg.setup_dearpygui()
 dpg.show_viewport()
 dpg.toggle_viewport_fullscreen()
