@@ -97,7 +97,7 @@ def buildCmdLines(singleFrame = True):
         exposure = f"--shutter {dpg.get_value("inExposure")}"
     
     fps = dpg.get_value("inFPS")
-    if dpg.get_value("cbSinleFile"):
+    if dpg.get_value("cbSingleFile"):
         singlStr = "--segment 1"
     else:
         singlStr = ""
@@ -378,7 +378,7 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
         "HG 1/8,   LG 7/8",
         "HG 1/4,   LG 3/4"), label="Blending", tag="inBlending", default_value="HG 1/2,   LG 1/2", width=150)
     with dpg.group(horizontal=True):
-        dpg.add_slider_int(tag="inExposure", label = "Exposure time", min_value=0, default_value=5000, max_value=100000, format="%d us", width=200)
+        dpg.add_slider_int(tag="inExposure", label = "Exposure time", min_value=0, default_value=0, max_value=100000, format="%d us", width=200)
         dpg.add_button(label="M", callback=readMetadataExpBtn_cb)
     with dpg.group(horizontal=True):
         dpg.add_text("WB gains:")
@@ -390,7 +390,7 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
         dpg.add_input_int(tag="inFPS", label = "FPS", default_value=25, min_value=1, max_value=50, width=70)
         # f"{tS//3600:02d}:{tS%3600//60:02d}:{tS%60:02d}"
         dpg.add_drag_int(tag="inVideoLength", label = "Length", min_value=1, default_value=10, max_value=600, format="%02d sec", width=100)
-    dpg.add_checkbox(label="Single file", tag="cbSinleFile")
+    dpg.add_checkbox(label="Single file", tag="cbSingleFile")
 
     dpg.add_separator(label="Raw manipulation")
     with dpg.group(horizontal=True):
