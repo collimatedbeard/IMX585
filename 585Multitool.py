@@ -36,8 +36,9 @@ def takePhotoBtn_cb():
 
 
 def startVideoBtn_cb():
-    dpg.set_value("tbLog", "Please refrain from clicking this button.\n")
-    # execCommand(buildCmdLines(singleFrame=False))
+    dpg.set_value("tbLog", "Recording video...\n")
+    execCommand(buildCmdLines(singleFrame=False))
+    
 
 def dncBtn_cb():
     raw_files = glob.glob("*.raw")
@@ -96,11 +97,6 @@ def buildCmdLines(singleFrame = True):
     else:
         exposure = f"--shutter {dpg.get_value("inExposure")}"
     
-    fps = dpg.get_value("inFPS")
-    if dpg.get_value("cbSingleFile"):
-        singlStr = "--segment 1"
-    else:
-        singlStr = ""
     if dpg.get_value("cSensMode") == "10 bit":
         bittness = 10
         hdr = False
@@ -168,7 +164,15 @@ def buildCmdLines(singleFrame = True):
     if singleFrame:
         cmds.append(f'rpicam-raw -n --segment 1 -o /tmp/test_%05d.raw -f -t 3000 --mode "3856:2180:{bittness}:U" --framerate 5 --denoise off -v 3 --gain {sensGain:.1f} {awbgains} {exposure} --metadata /tmp/test.txt')
     else: # Video settings
-        cmds.append(f'rpicam-raw -n {singlStr} -o /mnt/test_%05d.raw -f -t 3000 --mode "3856:2180:{bittness}:U" --framerate {fps} --denoise off -v 3 --gain {sensGain:.1f} {awbgains} {exposure} --metadata /mnt/test.txt')
+        fps = dpg.get_value("inFPS")
+        if dpg.get_value("cbSingleFile"):
+            singleStr = ""
+            splitStr = ""
+        else:
+            singleStr = "--segment 1"
+            splitStr = "_%05d"
+        vidlen = dpg.get_value("inVideoLength") * 1000
+        cmds.append(f'rpicam-raw -n {singleStr} -o /mnt/test{splitStr}.raw -f -t {vidlen} --mode "3856:2180:{bittness}:U" --framerate {fps} --denoise off -v 3 --gain {sensGain:.1f} {awbgains} {exposure} --metadata /mnt/test.txt')
     # cmds.append('ls -l /tmp')
     return cmds
 
@@ -214,7 +218,7 @@ def processImage():
     elif dpg.get_value("inShowParts") == "Above HG":
         dataimg[dataimg < setLG] = 0
     
-    # extract color chanels if we are not doing DeBayer or Raw, we will need them later
+    # extract color channels if we are not doing DeBayer or Raw, we will need them later
     if dpg.get_value("inDeBayer") in ["RG/GB", "R", "G1", "G2", "B"]:
         R  = dataimg[0::2, 0::2]
         G1 = dataimg[0::2, 1::2]
