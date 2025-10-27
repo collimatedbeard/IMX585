@@ -206,7 +206,9 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# RAW sensor files
+# Data files
 *.raw
-test.txt
+*.txt
 *.ini
+*.mov
+*.tiff
