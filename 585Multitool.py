@@ -50,6 +50,71 @@ def dncBtn_cb():
             dataraw = np.fromfile(rawfile, np.uint16)
             processImage()
 
+
+def saveToDNG_cb(sender, app_data, user_data):
+    global dataraw
+    from fractions import Fraction
+    from pidng.core import RAW2DNG, DNGTags, Tag
+    from pidng.defs import CalibrationIlluminant, PhotometricInterpretation, CFAPattern, DNGVersion, Orientation, PreviewColorSpace
+    max_denominator = 1000000
+
+    dataimg = dataraw.copy()
+    if dpg.get_value("cb12Bit"):
+        dataimg = np.right_shift(dataimg, np.uint16(4)) # back to 12 bit, original image is shifted by four bits for some reason (so PI ISP can expose correctly?)
+    width = dataimg.size // height
+    dataimg = np.reshape(dataimg, (height, width))
+    imgbuffer = dataimg.copy()
+    h, w = imgbuffer.shape
+    numPixels = w*h
+    rawImage = np.reshape(imgbuffer, (1, numPixels))
+
+    black_level = dpg.get_value("inBlackLvl")
+    # CCM
+    correction_matrix1 = np.array([[1.81603, -0.42304, -0.39299],[-0.74706, 2.01193, -0.26487],[0.30873, -1.61788, 2.30915]])
+    ccm1 = np.ravel(correction_matrix1)
+    ccm1 = [Fraction(ccm1[i]).limit_denominator(100000).as_integer_ratio() for i in range(len(ccm1))]
+    correction_matrix2 = np.array([[1.73138, -0.58101, -0.15037],[-0.36908, 1.67814, -0.30906],[0.07966, -0.69095, 1.61129]])
+    ccm2 = np.ravel(correction_matrix2)
+    ccm2 = [Fraction(ccm2[i]).limit_denominator(100000).as_integer_ratio() for i in range(len(ccm2))]
+    # WB
+    asn = [Fraction(dpg.get_value("inGainR")).limit_denominator(max_denominator).as_integer_ratio() # red channel
+        , Fraction(1).limit_denominator(max_denominator).as_integer_ratio()                         # green is always 1
+        , Fraction(dpg.get_value("inGainB")).limit_denominator(max_denominator).as_integer_ratio()] # blue channel
+    # DNG tags
+    t = DNGTags()
+    t.set(Tag.ImageWidth, w)
+    t.set(Tag.ImageLength, h)
+    # crop here instead image data
+    t.set(Tag.DefaultCropOrigin, [0, 20])
+    t.set(Tag.DefaultCropSize, [3840, 2160])
+    t.set(Tag.PlanarConfiguration, 1) # pcInterleaved = 1, pcPlanar	= 2
+    t.set(Tag.Orientation, Orientation.Horizontal)
+    t.set(Tag.PhotometricInterpretation, PhotometricInterpretation.Color_Filter_Array)
+    t.set(Tag.SamplesPerPixel, 1)
+    t.set(Tag.BitsPerSample, 16)
+    t.set(Tag.CFARepeatPatternDim, [2,2])
+    t.set(Tag.CFAPattern, CFAPattern.RGGB)
+    t.set(Tag.BlackLevel, black_level)
+    t.set(Tag.WhiteLevel, ((1 << 16) -1) )
+    t.set(Tag.ColorMatrix1, ccm1)
+    t.set(Tag.ColorMatrix2, ccm2)
+    t.set(Tag.CalibrationIlluminant1, CalibrationIlluminant.Tungsten_Incandescent)
+    t.set(Tag.CalibrationIlluminant2, CalibrationIlluminant.D55)
+    t.set(Tag.AsShotNeutral, asn)
+
+    # t.set(Tag.BaselineExposure, [[-150,100]])
+    t.set(Tag.Make, "CinePi")
+    t.set(Tag.Model, "IMX585")
+    t.set(Tag.DNGVersion, DNGVersion.V1_4)
+    t.set(Tag.DNGBackwardVersion, DNGVersion.V1_1)
+    t.set(Tag.PreviewColorSpace, PreviewColorSpace.sRGB)
+    # save to DNG file
+    r = RAW2DNG()
+    r.options(t, path=app_data['current_path'])
+    r.convert(rawImage, filename=app_data['file_name'])
+    dpg.set_value("tbLog", dpg.get_value("tbLog") + f"\nFile {app_data['file_name']} saved.")
+
+
 def setWBPickBtn_cb():
     pass
 
@@ -72,7 +137,6 @@ def readMetadataExpBtn_cb():
         metadata = json.load(metadatafile) 
         dpg.set_value("inExposure", metadata[frameNrForPreview]["ExposureTime"])
 
-        
 def execCommand(cmdString):
     if ssh_mode:
         c = Connection(host_name)
@@ -109,10 +173,10 @@ def buildCmdLines(singleFrame = True):
     elif dpg.get_value("cSensMode") == "16 bit HDR":
         bittness = 16
         hdr = True
-    
+
     sensGain = dpg.get_value("inGainSens")
 
-    if dpg.get_value("inWBSetting") == "Fixed 1,1":
+    if dpg.get_value("inWBSetting") == "UniWB":
         awbgains = "--awbgain 1.0,1.0"
     elif dpg.get_value("inWBSetting") == "WB from below":
         r = dpg.get_value("inGainR")   # red channel
@@ -298,7 +362,6 @@ def processImage():
     dpg.set_value('drgHG', setHG)
 
 
-
 with dpg.theme(tag="__window_nopad"):
     with dpg.theme_component(dpg.mvAll): # remove padding
         dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 0, category=dpg.mvThemeCat_Core)
@@ -341,7 +404,7 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
     with dpg.menu_bar():
         with dpg.menu(label="File"):
             dpg.add_menu_item(label="Save screen")
-            dpg.add_menu_item(label="Export DNG")
+            dpg.add_menu_item(label="Export DNG", callback=lambda: dpg.show_item("file_dialog_dng"))
             dpg.add_menu_item(label="Exit", callback=lambda: dpg.stop_dearpygui())
 
         with dpg.menu(label="Settings"):
@@ -386,7 +449,7 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
         dpg.add_button(label="M", callback=readMetadataExpBtn_cb)
     with dpg.group(horizontal=True):
         dpg.add_text("WB gains:")
-        dpg.add_radio_button(("Auto", "Fixed 1,1", "WB from below"), tag="inWBSetting", default_value="Auto", horizontal=True)
+        dpg.add_radio_button(("Auto", "UniWB", "WB from below"), tag="inWBSetting", default_value="Auto", horizontal=True)
 
 
     dpg.add_separator(label="Video options")
@@ -477,6 +540,10 @@ with dpg.window(label="Histogram", height=400, width=750, no_scrollbar=True, tag
 
 with dpg.window(label = "Log", height=500, width=750, tag="Log"):
     dpg.add_input_text(multiline=True, height=-1, width=-1, tag="tbLog")
+
+with dpg.file_dialog(directory_selector=False, show=False, callback=saveToDNG_cb, tag="file_dialog_dng", width=700 ,height=400):
+    dpg.add_file_extension(".dng", color=(255, 0, 255, 255), custom_text="DNG")
+    dpg.add_file_extension(".*")
 
 dpg.bind_item_theme("Histogram", "__window_nopad")
 dpg.bind_item_theme("Primary Window", "__window_noborder")
