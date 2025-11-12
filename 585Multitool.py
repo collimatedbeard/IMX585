@@ -38,7 +38,7 @@ def takePhotoBtn_cb():
 def startVideoBtn_cb():
     dpg.set_value("tbLog", "Recording video...\n")
     execCommand(buildCmdLines(singleFrame=False))
-    
+
 
 def dncBtn_cb():
     raw_files = glob.glob("*.raw")
@@ -50,6 +50,9 @@ def dncBtn_cb():
             dataraw = np.fromfile(rawfile, np.uint16)
             processImage()
 
+
+def calc_exposure(framerate, shutter_angle):
+    return int((1 / framerate) * (shutter_angle / 360) * 1000000)
 
 def saveToDNG_cb(sender, app_data, user_data):
     global dataraw
@@ -457,6 +460,11 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
         dpg.add_input_int(tag="inFPS", label = "FPS", default_value=25, min_value=1, max_value=50, width=70)
         # f"{tS//3600:02d}:{tS%3600//60:02d}:{tS%60:02d}"
         dpg.add_drag_int(tag="inVideoLength", label = "Length", min_value=1, default_value=10, max_value=600, format="%02d sec", width=100)
+    with dpg.group(horizontal=True):
+        dpg.add_text("Shutter:")
+        dpg.add_button(label="90",  callback=lambda: dpg.set_value("inExposure", calc_exposure(dpg.get_value("inFPS"),  90)))
+        dpg.add_button(label="180", callback=lambda: dpg.set_value("inExposure", calc_exposure(dpg.get_value("inFPS"), 180)))
+        dpg.add_button(label="270", callback=lambda: dpg.set_value("inExposure", calc_exposure(dpg.get_value("inFPS"), 270)))
     dpg.add_checkbox(label="Single file", tag="cbSingleFile")
 
     dpg.add_separator(label="Raw manipulation")
