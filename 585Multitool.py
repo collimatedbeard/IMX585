@@ -154,8 +154,8 @@ def execCommand(cmdString):
         for cmd in cmdString:
             result = os.popen(cmd).read()
             dpg.set_value("tbLog", dpg.get_value("tbLog") + result)
-            shutil.copy2(f'/tmp/test_{frameNrForPreview:05d}.raw', os.getcwd())
-            shutil.copy2('/tmp/test.txt', os.getcwd())
+        shutil.copy2(f'/tmp/test_{frameNrForPreview:05d}.raw', os.getcwd())
+        shutil.copy2('/tmp/test.txt', os.getcwd())
 
 def buildCmdLines(singleFrame = True):
     cmds = []
