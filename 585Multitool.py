@@ -38,17 +38,26 @@ def takePhotoBtn_cb():
 def startVideoBtn_cb():
     dpg.set_value("tbLog", "Recording video...\n")
     execCommand(buildCmdLines(singleFrame=False))
+    dpg.set_value("inTake", dpg.get_value("inTake") + 1)
 
 
-def dncBtn_cb():
-    raw_files = glob.glob("*.raw")
-    if raw_files:
-        random_file = random.choice(raw_files)
-        # print(random_file)
-        with open(random_file, "rb") as rawfile:
-            global dataraw
-            dataraw = np.fromfile(rawfile, np.uint16)
-            processImage()
+def shellScrBtn_cb():
+    shfilename = f'{dpg.get_value("inScene")}_{dpg.get_value("inTake"):02d}.sh'
+    with open(shfilename, "w") as outfile:
+        outfile.write("\n".join(buildCmdLines(singleFrame=False)))
+    if ssh_mode:
+        c = Connection(host_name)
+        c.put(shfilename, f'/mnt/{shfilename}', preserve_mode=False)
+    dpg.set_value("tbLog", f"Saved {shfilename} to remote\n")
+
+    # raw_files = glob.glob("*.raw")
+    # if raw_files:
+    #     random_file = random.choice(raw_files)
+    #     # print(random_file)
+    #     with open(random_file, "rb") as rawfile:
+    #         global dataraw
+    #         dataraw = np.fromfile(rawfile, np.uint16)
+    #         processImage()
 
 
 def calc_exposure(framerate, shutter_angle):
@@ -229,8 +238,9 @@ def buildCmdLines(singleFrame = True):
     cmds.append(f'v4l2-ctl -d /dev/v4l-subdev2 -l') 
 
     if singleFrame:
-        cmds.append(f'rpicam-raw -n --segment 1 -o /tmp/test_%05d.raw -f -t 3000 --mode "3856:2180:{bittness}:U" --framerate 5 --denoise off -v 3 --gain {sensGain:.1f} {awbgains} {exposure} --metadata /tmp/test.txt')
+        cmds.append(f'rpicam-raw -n --segment 1 -o /tmp/test_%05d.raw -f -t 3500 --mode "3856:2180:{bittness}:U" --framerate 5 --denoise off -v 3 --gain {sensGain:.1f} {awbgains} {exposure} --metadata /tmp/test.txt')
     else: # Video settings
+        
         fps = dpg.get_value("inFPS")
         if dpg.get_value("cbSingleFile"):
             singleStr = ""
@@ -238,8 +248,10 @@ def buildCmdLines(singleFrame = True):
         else:
             singleStr = "--segment 1"
             splitStr = "_%05d"
+        rawfilename = f'{dpg.get_value("inScene")}_{dpg.get_value("inTake"):02d}{splitStr}'
+        txtfilename = f'{dpg.get_value("inScene")}_{dpg.get_value("inTake"):02d}'
         vidlen = dpg.get_value("inVideoLength") * 1000
-        cmds.append(f'rpicam-raw -n {singleStr} -o /mnt/test{splitStr}.raw -f -t {vidlen} --mode "3856:2180:{bittness}:U" --framerate {fps} --denoise off -v 3 --gain {sensGain:.1f} {awbgains} {exposure} --metadata /mnt/test.txt')
+        cmds.append(f'rpicam-raw -n {singleStr} -o /mnt/{rawfilename}.raw -f -t {vidlen} --mode "3856:2180:{bittness}:U" --framerate {fps} --denoise off -v 3 --gain {sensGain:.1f} {awbgains} {exposure} --metadata /mnt/{txtfilename}.txt')
     # cmds.append('ls -l /tmp')
     return cmds
 
@@ -426,7 +438,7 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
             dpg.bind_item_theme(dpg.last_item(), "__button_theme_photo")
             dpg.add_button(label="Start\nvideo", width=-1, callback=startVideoBtn_cb)
             dpg.bind_item_theme(dpg.last_item(), "__button_theme_video")
-            dpg.add_button(label="Don't\nclick", width=-1, callback=dncBtn_cb)
+            dpg.add_button(label="Push\nShell", width=-1, callback=shellScrBtn_cb)
             dpg.bind_item_theme(dpg.last_item(), "__button_theme_exit")
             dpg.add_button(label="\nExit", width=-1, callback=lambda: dpg.stop_dearpygui())
             dpg.bind_item_theme(dpg.last_item(), "__button_theme_exit")     
@@ -465,7 +477,10 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
         dpg.add_button(label="90",  callback=lambda: dpg.set_value("inExposure", calc_exposure(dpg.get_value("inFPS"),  90)))
         dpg.add_button(label="180", callback=lambda: dpg.set_value("inExposure", calc_exposure(dpg.get_value("inFPS"), 180)))
         dpg.add_button(label="270", callback=lambda: dpg.set_value("inExposure", calc_exposure(dpg.get_value("inFPS"), 270)))
-    dpg.add_checkbox(label="Single file", tag="cbSingleFile")
+    with dpg.group(horizontal=True):
+        dpg.add_input_text(tag="inScene", default_value="Scene")
+        dpg.add_input_int(tag="inTake", label = "Take", default_value=1, min_value=0, width=70)
+    dpg.add_checkbox(label="Single file", tag="cbSingleFile", default_value=True)
 
     dpg.add_separator(label="Raw manipulation")
     with dpg.group(horizontal=True):
