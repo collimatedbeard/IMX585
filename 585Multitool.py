@@ -43,22 +43,22 @@ def startVideoBtn_cb():
 
 def shellScrBtn_cb():
     shfilename = f'{dpg.get_value("inScene")}_{dpg.get_value("inTake"):02d}.sh'
-    with open(shfilename, "w") as outfile:
-        outfile.write("\n".join(buildCmdLines(singleFrame=False)))
+    with open(shfilename, "w", newline='\n') as outfile:
+        cmds = buildCmdLines(singleFrame=False)
+        cmds.insert(0, '#!/bin/bash')
+        outfile.write("\n".join(cmds))
+    dpg.set_value("tbLog", f"Saved {shfilename}\n")
+    cmd = f"chmod 755 /mnt/{shfilename}"
     if ssh_mode:
         c = Connection(host_name)
-        c.put(shfilename, f'/mnt/{shfilename}', preserve_mode=False)
-    dpg.set_value("tbLog", f"Saved {shfilename} to remote\n")
-
-    # raw_files = glob.glob("*.raw")
-    # if raw_files:
-    #     random_file = random.choice(raw_files)
-    #     # print(random_file)
-    #     with open(random_file, "rb") as rawfile:
-    #         global dataraw
-    #         dataraw = np.fromfile(rawfile, np.uint16)
-    #         processImage()
-
+        c.put(shfilename, f"/mnt/{shfilename}", preserve_mode=False)
+        result = c.run(cmd, hide=True, warn=True, pty=True)
+        dpg.set_value("tbLog", dpg.get_value("tbLog")
+                            + f'\n{result.command} {("FAIL", "OK")[result.ok]}\n'
+                            + result.stdout)
+    else: 
+        result = os.popen(cmd).read()
+        dpg.set_value("tbLog", dpg.get_value("tbLog") + result)
 
 def calc_exposure(framerate, shutter_angle):
     return int((1 / framerate) * (shutter_angle / 360) * 1000000)
