@@ -5,3 +5,7 @@ numpy
 opencv-python
 pandas
 scikit-learn
+ffmpeg-python
+colour-science
+colour-demosaicing
+OpenImageIO
