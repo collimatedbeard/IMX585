@@ -482,7 +482,7 @@ with dpg.window(label = "Controls", height = 700, width = 400, tag="Controls"):
         dpg.add_input_int(tag="inTake", label = "Take", default_value=1, min_value=0, width=70)
     dpg.add_checkbox(label="Single file", tag="cbSingleFile", default_value=True)
 
-    dpg.add_separator(label="Raw manipulation")
+    dpg.add_separator(label="Raw viewing manipulation")
     with dpg.group(horizontal=True):
         dpg.add_checkbox(label="Black Level", tag="cbBlackLvl", callback=lambda: processImage())
         dpg.add_input_int(label="Value", tag="inBlackLvl", default_value=3200, max_value=4000, width=150)
